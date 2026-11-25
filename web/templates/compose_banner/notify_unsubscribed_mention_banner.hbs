@@ -1,0 +1,9 @@
+{{#> compose_banner . }}
+    <p class="banner_message">
+        {{#if should_add_guest_user_indicator}}
+        {{#tr}}<strong>{name}</strong> <i>(guest)</i> is not subscribed to this channel, and was not notified that you mentioned them.{{/tr}}
+        {{else}}
+        {{#tr}}<strong>{name}</strong> is not subscribed to this channel, and was not notified that you mentioned them.{{/tr}}
+        {{/if}}
+    </p>
+{{/compose_banner}}

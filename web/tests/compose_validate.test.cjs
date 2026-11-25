@@ -683,11 +683,13 @@ test_ui("warn_if_mentioning_unsubscribed_user", async ({override, mock_template}
     };
 
     let new_banner_rendered = false;
+    let expected_can_notify = false;
     mock_template("compose_banner/not_subscribed_warning.hbs", false, (data) => {
         assert.equal(data.classname, compose_banner.CLASSNAMES.recipient_not_subscribed);
         assert.equal(data.user_id, 34);
         assert.equal(data.stream_id, 111);
         assert.equal(data.name, "Foo Barson");
+        assert.equal(data.can_notify, expected_can_notify);
         new_banner_rendered = true;
         return "<banner-stub>";
     });
@@ -763,6 +765,49 @@ test_ui("warn_if_mentioning_unsubscribed_user", async ({override, mock_template}
     $banner_container.set_find_results(".recipient_not_subscribed", $warning_row);
     await compose_validate.warn_if_mentioning_unsubscribed_user(mentioned_details, $textarea);
     assert.ok(!new_banner_rendered);
+
+    // In a public channel whose history is public to subscribers,
+    // the banner offers to notify the user once the message is sent.
+    sub.invite_only = false;
+    sub.history_public_to_subscribers = true;
+    expected_can_notify = true;
+    $banner_container.set_find_results(".recipient_not_subscribed", []);
+    await compose_validate.warn_if_mentioning_unsubscribed_user(mentioned_details, $textarea);
+    assert.ok(new_banner_rendered);
+});
+
+test_ui("get_notifiable_unsubscribed_mentioned_users", () => {
+    const $banner_container = $("#compose_banners");
+    const sub = make_stream({
+        stream_id: 112,
+        name: "public channel",
+        invite_only: false,
+        history_public_to_subscribers: true,
+    });
+    stream_data.add_sub_for_tests(sub);
+
+    function make_banner(name, user_id, stream_id) {
+        const $banner = $.create(name);
+        $banner.attr("data-user-id", String(user_id));
+        $banner.attr("data-stream-id", String(stream_id));
+        return $banner;
+    }
+
+    // Unknown channels have no notifiable users.
+    assert.deepEqual(compose_validate.get_notifiable_unsubscribed_mentioned_users(9999), []);
+
+    $banner_container.set_find_results(".recipient_not_subscribed", [
+        make_banner("alice-banner", alice.user_id, sub.stream_id)[0],
+        // Guests can't join public channels, so they aren't notified.
+        make_banner("guest-banner", guest.user_id, sub.stream_id)[0],
+        // A stale banner for a different channel is ignored.
+        make_banner("other-channel-banner", bob.user_id, social_sub.stream_id)[0],
+        // Banners for unknown users are ignored.
+        make_banner("unknown-user-banner", 9999, sub.stream_id)[0],
+    ]);
+    assert.deepEqual(compose_validate.get_notifiable_unsubscribed_mentioned_users(sub.stream_id), [
+        alice,
+    ]);
 });
 
 test_ui("maybe_clear_stale_recipient_not_subscribed_warnings", () => {

@@ -5,9 +5,11 @@ import render_automatic_new_visibility_policy_banner from "../templates/compose_
 import render_compose_banner from "../templates/compose_banner/compose_banner.hbs";
 import render_jump_to_sent_message_conversation_banner from "../templates/compose_banner/jump_to_sent_message_conversation_banner.hbs";
 import render_message_sent_banner from "../templates/compose_banner/message_sent_banner.hbs";
+import render_notify_unsubscribed_mention_banner from "../templates/compose_banner/notify_unsubscribed_mention_banner.hbs";
 import render_unmute_topic_banner from "../templates/compose_banner/unmute_topic_banner.hbs";
 
 import * as blueslip from "./blueslip.ts";
+import * as channel from "./channel.ts";
 import type {SentMessageData} from "./compose.ts";
 import * as compose_banner from "./compose_banner.ts";
 import * as hash_util from "./hash_util.ts";
@@ -16,6 +18,7 @@ import * as message_lists from "./message_lists.ts";
 import type {Message} from "./message_store.ts";
 import * as narrow_state from "./narrow_state.ts";
 import * as onboarding_steps from "./onboarding_steps.ts";
+import type {User} from "./people.ts";
 import * as people from "./people.ts";
 import * as stream_data from "./stream_data.ts";
 import {user_settings} from "./user_settings.ts";
@@ -39,6 +42,68 @@ export function notify_unmute(muted_narrow: string, stream_id: number, topic_nam
         $unmute_notification,
         $("#compose_banners"),
     );
+}
+
+export function notify_unsubscribed_mentions(
+    message_id: number,
+    stream_id: number,
+    users: User[],
+): void {
+    compose_banner.clear_notify_unsubscribed_mention_banners();
+    for (const user of users) {
+        const $banner = $(
+            render_notify_unsubscribed_mention_banner({
+                user_id: user.user_id,
+                stream_id,
+                name: user.full_name,
+                should_add_guest_user_indicator: people.should_add_guest_user_indicator(
+                    user.user_id,
+                ),
+                classname: compose_banner.CLASSNAMES.notify_unsubscribed_mention,
+                banner_type: "",
+                button_text: $t({defaultMessage: "Notify them"}),
+            }),
+        );
+        $banner.attr("data-message-id", message_id);
+        compose_banner.append_compose_banner_to_banner_list($banner, $("#compose_banners"));
+    }
+}
+
+export function send_unsubscribed_mention_notification($banner: JQuery): void {
+    const user_id = Number($banner.attr("data-user-id"));
+    const message_id = Number($banner.attr("data-message-id"));
+    const user = people.get_by_user_id(user_id);
+    $banner.find(".main-view-banner-action-button").prop("disabled", true);
+
+    void channel.post({
+        url: `/json/messages/${message_id}/notify_unsubscribed_mentions`,
+        data: {user_ids: JSON.stringify([user_id])},
+        success() {
+            const $success_banner = $(
+                render_compose_banner({
+                    banner_type: compose_banner.SUCCESS,
+                    banner_text: $t(
+                        {defaultMessage: "{name} was notified that you mentioned them."},
+                        {name: user.full_name},
+                    ),
+                    classname: compose_banner.CLASSNAMES.notify_unsubscribed_mention_success,
+                    user_id,
+                }),
+            );
+            $banner.replaceWith($success_banner);
+        },
+        error(xhr) {
+            $banner.remove();
+            compose_banner.show_error_message(
+                channel.xhr_error_message(
+                    $t({defaultMessage: "Failed to notify {name}."}, {name: user.full_name}),
+                    xhr,
+                ),
+                compose_banner.CLASSNAMES.generic_compose_error,
+                $("#compose_banners"),
+            );
+        },
+    });
 }
 
 type MessageRecipient =

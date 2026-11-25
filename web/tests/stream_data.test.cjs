@@ -1845,6 +1845,47 @@ test("can_subscribe_others", ({override}) => {
     assert.equal(stream_data.can_subscribe_others(sub), false);
 });
 
+test("can_notify_unsubscribed_user", () => {
+    const sub = {
+        name: "Denmark",
+        subscribed: true,
+        color: "red",
+        stream_id: 1,
+        invite_only: false,
+        is_web_public: false,
+        history_public_to_subscribers: true,
+        can_add_subscribers_group: nobody_group.id,
+        can_subscribe_group: nobody_group.id,
+        can_administer_channel_group: nobody_group.id,
+    };
+    stream_data.add_sub_for_tests(sub);
+
+    // Members can join public channels; guests can't.
+    assert.equal(stream_data.can_notify_unsubscribed_user(sub, test_user), true);
+    assert.equal(stream_data.can_notify_unsubscribed_user(sub, guest_user), false);
+
+    // Everyone, including guests, can access web-public channels.
+    sub.is_web_public = true;
+    assert.equal(stream_data.can_notify_unsubscribed_user(sub, guest_user), true);
+    sub.is_web_public = false;
+
+    // Private channels require permission to join the channel.
+    sub.invite_only = true;
+    assert.equal(stream_data.can_notify_unsubscribed_user(sub, test_user), false);
+    sub.can_subscribe_group = students.id;
+    assert.equal(stream_data.can_notify_unsubscribed_user(sub, test_user), true);
+    sub.can_subscribe_group = nobody_group.id;
+    sub.can_add_subscribers_group = students.id;
+    assert.equal(stream_data.can_notify_unsubscribed_user(sub, test_user), true);
+
+    // A user who joins a channel with protected history can't read
+    // older messages, so they are never notified.
+    sub.history_public_to_subscribers = false;
+    assert.equal(stream_data.can_notify_unsubscribed_user(sub, test_user), false);
+    sub.invite_only = false;
+    assert.equal(stream_data.can_notify_unsubscribed_user(sub, test_user), false);
+});
+
 test("user_can_set_topics_policy", ({override}) => {
     const sub = {
         name: "Denmark",

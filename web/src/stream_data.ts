@@ -854,6 +854,32 @@ export function can_subscribe_user(sub: StreamSubscription, user_id: number): bo
     return can_subscribe_others(sub);
 }
 
+// Whether a user who is mentioned in a message in this channel, but is
+// not subscribed to it, can be notified about the mention via a direct
+// message from the Notification Bot. The server enforces the same
+// rules: the user must be able to read the message by subscribing to
+// the channel, so the channel's history must be public to subscribers,
+// and the user must be allowed to join the channel.
+export function can_notify_unsubscribed_user(sub: StreamSubscription, user: User): boolean {
+    if (!sub.history_public_to_subscribers) {
+        return false;
+    }
+
+    if (sub.is_web_public) {
+        return true;
+    }
+
+    if (user.is_guest) {
+        return false;
+    }
+
+    if (!sub.invite_only) {
+        return true;
+    }
+
+    return has_content_access_via_group_permissions(sub, user);
+}
+
 export function can_unsubscribe_others(sub: StreamSubscription): boolean {
     // Whether the current user has permission to remove other users
     // from the stream. Organization administrators can remove users

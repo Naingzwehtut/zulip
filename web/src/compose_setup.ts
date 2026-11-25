@@ -376,6 +376,19 @@ export function initialize(): void {
 
     $("body").on(
         "click",
+        `.${compose_banner.CLASSNAMES.notify_unsubscribed_mention
+            .split(" ")
+            .map((classname) => CSS.escape(classname))
+            .join(".")} .main-view-banner-action-button`,
+        (event) => {
+            event.preventDefault();
+            const $banner = $(event.target).closest(".main-view-banner");
+            compose_notifications.send_unsubscribed_mention_notification($banner);
+        },
+    );
+
+    $("body").on(
+        "click",
         `.${CSS.escape(compose_banner.CLASSNAMES.search_view)} .main-view-banner-action-button`,
         (event) => {
             event.preventDefault();

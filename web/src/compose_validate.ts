@@ -23,6 +23,7 @@ import * as message_store from "./message_store.ts";
 import * as message_util from "./message_util.ts";
 import * as narrow_state from "./narrow_state.ts";
 import * as peer_data from "./peer_data.ts";
+import type {User} from "./people.ts";
 import * as people from "./people.ts";
 import * as reactions from "./reactions.ts";
 import * as recent_senders from "./recent_senders.ts";
@@ -208,15 +209,17 @@ export function check_dm_permissions_and_get_error_string(user_ids_string: strin
     return "";
 }
 
+function is_in_editing_area($textarea: JQuery<HTMLTextAreaElement>): boolean {
+    return $textarea.closest(".message_row").length > 0;
+}
+
 function get_stream_id_for_textarea($textarea: JQuery<HTMLTextAreaElement>): number | undefined {
     // Returns the stream ID, if any, associated with the textarea:
     // The recipient of a message being edited, or the target
     // recipient of a message being drafted in the compose box.
     // Returns undefined if the appropriate context is a direct
     // message conversation.
-    const is_in_editing_area = $textarea.closest(".message_row").length > 0;
-
-    if (is_in_editing_area) {
+    if (is_in_editing_area($textarea)) {
         const stream_id_str = $textarea
             .closest(".recipient_row")
             .find(".message_header")
@@ -338,6 +341,10 @@ export async function warn_if_mentioning_unsubscribed_user(
         );
         const sub = stream_data.get_sub_by_id(stream_id)!;
         const can_subscribe_other_users = stream_data.can_subscribe_others(sub);
+        // Notifying is only offered for new messages, not when editing.
+        const can_notify =
+            !is_in_editing_area($textarea) &&
+            stream_data.can_notify_unsubscribed_user(sub, mentioned.user);
 
         if (!existing_invites.includes(user_id)) {
             const context = {
@@ -348,6 +355,7 @@ export async function warn_if_mentioning_unsubscribed_user(
                     ? $t({defaultMessage: "Subscribe them"})
                     : null,
                 can_subscribe_other_users,
+                can_notify,
                 name: mentioned.user.full_name,
                 classname: compose_banner.CLASSNAMES.recipient_not_subscribed,
                 should_add_guest_user_indicator: people.should_add_guest_user_indicator(user_id),
@@ -405,6 +413,31 @@ export function maybe_clear_stale_recipient_not_subscribed_warnings(
             $(banner).remove();
         }
     }
+}
+
+// Returns the users with a "recipient not subscribed" banner in the
+// compose box who can be notified about the mention once the message
+// is sent. maybe_clear_stale_recipient_not_subscribed_warnings has
+// already removed the banners of users who are no longer mentioned.
+export function get_notifiable_unsubscribed_mentioned_users(stream_id: number): User[] {
+    const sub = stream_data.get_sub_by_id(stream_id);
+    if (sub === undefined) {
+        return [];
+    }
+    const $banners = $("#compose_banners").find(
+        `.${CSS.escape(compose_banner.CLASSNAMES.recipient_not_subscribed)}`,
+    );
+    const users: User[] = [];
+    for (const banner of $banners) {
+        if (Number($(banner).attr("data-stream-id")) !== stream_id) {
+            continue;
+        }
+        const user = people.maybe_get_user_by_id(Number($(banner).attr("data-user-id")), true);
+        if (user !== undefined && stream_data.can_notify_unsubscribed_user(sub, user)) {
+            users.push(user);
+        }
+    }
+    return users;
 }
 
 export async function warn_if_mentioning_unsubscribed_group(

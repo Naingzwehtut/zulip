@@ -43,6 +43,11 @@ export const CLASSNAMES = {
     convert_pasted_text_to_file: "convert_pasted_text_to_file",
     // unmute topic notifications are styled like warnings but have distinct behaviour
     unmute_topic_notification: "unmute_topic_notification warning-style",
+    // Shown after sending a message that mentions users who aren't
+    // subscribed to the channel. Like unmute topic notifications, these
+    // are styled like warnings, but aren't cleared with compose warnings.
+    notify_unsubscribed_mention: "notify_unsubscribed_mention warning-style",
+    notify_unsubscribed_mention_success: "notify_unsubscribed_mention_success",
     // warnings
     topic_resolved: "topic_resolved",
     recipient_not_subscribed: "recipient_not_subscribed",
@@ -168,6 +173,16 @@ export function clear_unmute_topic_notifications(): void {
             .map((classname) => CSS.escape(classname))
             .join(".")}`,
     ).remove();
+}
+
+export function clear_notify_unsubscribed_mention_banners(): void {
+    $(
+        `#compose_banners .${CLASSNAMES.notify_unsubscribed_mention
+            .split(" ")
+            .map((classname) => CSS.escape(classname))
+            .join(".")}`,
+    ).remove();
+    $(`#compose_banners .${CSS.escape(CLASSNAMES.notify_unsubscribed_mention_success)}`).remove();
 }
 
 export function clear_search_view_banner(): void {

@@ -21,6 +21,7 @@ import * as message_events from "./message_events.ts";
 import type {LocalMessage} from "./message_helper.ts";
 import * as message_viewport from "./message_viewport.ts";
 import * as onboarding_steps from "./onboarding_steps.ts";
+import type {User} from "./people.ts";
 import * as reload from "./reload.ts";
 import * as scheduled_messages from "./scheduled_messages.ts";
 import * as sent_messages from "./sent_messages.ts";
@@ -132,6 +133,7 @@ export type SentMessageData = SendMessageData & {
 export function send_message_success(
     sent_message: SentMessageData | LocalMessage,
     data: PostMessageAPIData,
+    unsubscribed_mentioned_users: User[] = [],
 ): void {
     if (!sent_message.locally_echoed) {
         clear_compose_box();
@@ -141,6 +143,14 @@ export function send_message_success(
     drafts.draft_model.deleteDrafts([sent_message.draft_id]);
 
     if (sent_message.type === "stream") {
+        if (unsubscribed_mentioned_users.length > 0) {
+            compose_notifications.notify_unsubscribed_mentions(
+                data.id,
+                sent_message.stream_id,
+                unsubscribed_mentioned_users,
+            );
+        }
+
         if (data.automatic_new_visibility_policy) {
             if (!onboarding_steps.ONE_TIME_NOTICES_TO_DISPLAY.has("visibility_policy_banner")) {
                 return;
@@ -165,7 +175,7 @@ export function send_message_success(
     }
 }
 
-export let send_message = (): void => {
+export let send_message = (unsubscribed_mentioned_users: User[] = []): void => {
     // Changes here must also be kept in sync with echo.try_deliver_locally
     compose_state.set_recipient_edited_manually(false);
     compose_state.set_is_content_unedited_restored_draft(false);
@@ -251,6 +261,7 @@ export let send_message = (): void => {
                 resend: false,
             },
             parsed_data,
+            unsubscribed_mentioned_users,
         );
     }
 
@@ -349,6 +360,15 @@ export let finish = (scheduling_message = false): boolean | undefined => {
         return undefined;
     }
 
+    // Collect the mentioned users we can offer to notify after the
+    // message is sent before clear_invites removes the "not
+    // subscribed" banners that we get them from.
+    const stream_id = compose_state.stream_id();
+    const unsubscribed_mentioned_users =
+        compose_state.get_message_type() === "stream" && stream_id !== undefined
+            ? compose_validate.get_notifiable_unsubscribed_mentioned_users(stream_id)
+            : [];
+
     clear_invites();
     clear_private_stream_alert();
     compose_banner.clear_message_sent_banners();
@@ -375,7 +395,7 @@ export let finish = (scheduling_message = false): boolean | undefined => {
     if (scheduling_message) {
         schedule_message_to_custom_date();
     } else {
-        send_message();
+        send_message(unsubscribed_mentioned_users);
     }
     do_post_send_tasks();
     return true;

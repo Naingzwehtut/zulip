@@ -154,7 +154,11 @@ user_groups.initialize({realm_user_groups: [nobody, everyone]});
 
 function test_ui(label, f) {
     // TODO: initialize data more aggressively.
-    run_test(label, f);
+    run_test(label, (helpers) => {
+        // By default, there are no "recipient not subscribed" banners.
+        $("#compose_banners").set_find_results(".recipient_not_subscribed", []);
+        return f(helpers);
+    });
 }
 
 function initialize_handlers({override}) {
@@ -565,13 +569,23 @@ test_ui("handle_enter_key_with_preview_open", ({override, override_rewire}) => {
     fake_compose_box.show_message_preview();
 
     override(user_settings, "enter_sends", true);
+    // Alice was mentioned, but isn't subscribed; finish() must collect
+    // her from the banner before clearing it, so that we can offer to
+    // notify her once the message is sent.
+    const $alice_banner = $.create("alice-not-subscribed-banner");
+    $alice_banner.attr("data-user-id", String(alice.user_id));
+    $alice_banner.attr("data-stream-id", String(social.stream_id));
+    $("#compose_banners").set_find_results(".recipient_not_subscribed", [$alice_banner[0]]);
+
     let send_message_called = false;
-    override_rewire(compose, "send_message", () => {
+    override_rewire(compose, "send_message", (unsubscribed_mentioned_users) => {
+        assert.deepEqual(unsubscribed_mentioned_users, [alice]);
         send_message_called = true;
     });
     override(realm, "realm_topics_policy", "allow_empty_topic");
 
     compose.handle_enter_key_with_preview_open();
+    $("#compose_banners").set_find_results(".recipient_not_subscribed", []);
     // Preview mode should remain on after finish() returns, because
     // clear_preview_area() is now called inside clear_compose_box(),
     // which only runs when the server confirms the send.
