@@ -1712,6 +1712,35 @@ def report_message(client: Client) -> None:
     validate_against_openapi_schema(result, "/messages/{message_id}/report", "post", "200")
 
 
+@openapi_test_function("/messages/{message_id}/notify_unsubscribed_mentions:post")
+def notify_unsubscribed_mentions(client: Client) -> None:
+    ensure_users([10], ["hamlet"])
+    result = client.add_subscriptions(streams=[{"name": "mention notifications example"}])
+    assert_success_response(result)
+    result = client.send_message(
+        {
+            "type": "stream",
+            "to": "mention notifications example",
+            "topic": "example",
+            "content": "@**|10** Could you take a look at this?",
+        }
+    )
+    message_id = result["id"]
+    # {code_example|start}
+    # Notify mentioned users who aren't subscribed to the channel.
+    user_ids = [10]
+    result = client.call_endpoint(
+        f"/messages/{message_id}/notify_unsubscribed_mentions",
+        method="POST",
+        request={"user_ids": json.dumps(user_ids)},
+    )
+    # {code_example|end}
+    assert_success_response(result)
+    validate_against_openapi_schema(
+        result, "/messages/{message_id}/notify_unsubscribed_mentions", "post", "200"
+    )
+
+
 def register_queue_all_events(client: Client) -> str:
     # Register the queue and get all events.
     # Mainly for verifying schema of /register.
@@ -2204,6 +2233,7 @@ def test_messages(client: Client, nonadmin_client: Client) -> None:
     get_read_receipts(client, message_id)
     delete_message(client, message_id)
     report_message(client)
+    notify_unsubscribed_mentions(client)
     mark_all_as_read(client)
     mark_stream_as_read(client)
     mark_topic_as_read(client)

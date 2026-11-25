@@ -11151,6 +11151,75 @@ paths:
                     description: |
                       An example JSON error response for when the organization's moderation
                       request channel is not configured:
+  /messages/{message_id}/notify_unsubscribed_mentions:
+    post:
+      operationId: notify-unsubscribed-mentions
+      summary: Notify mentioned users who aren't subscribed
+      tags: ["messages"]
+      description: |
+        Notify users who were [mentioned](/help/mention-a-user-or-group) in
+        the targeted channel message, but who are not subscribed to the
+        channel and thus did not receive the message.
+
+        Each user is sent a direct message from the Notification Bot, which
+        links to the message and quotes its content.
+
+        Only the sender of the message can use this endpoint. Each user must
+        have a non-silent personal mention in the message, must not be
+        subscribed to the channel, and must be able to access the message
+        if they subscribe to the channel. That is, the channel's history
+        must be public to subscribers, and the user must have [permission
+        to join](/help/channel-permissions) the channel. Notably, guest users
+        can only be notified about messages in web-public channels.
+
+        Clients should only offer to notify users who meet these criteria,
+        and should only offer it once per user and message; the server does
+        not track whether a user was already notified about a message.
+
+        If any of the users can't be notified, an error is returned and no
+        notifications are sent.
+
+        **Changes**: New in Zulip 14.0 (feature level ZF-32dc67).
+      parameters:
+        - $ref: "#/components/parameters/MessageId"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                user_ids:
+                  description: |
+                    The IDs of the mentioned users to notify.
+                  type: array
+                  items:
+                    type: integer
+                  example: [10]
+              required:
+                - user_ids
+            encoding:
+              user_ids:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+        "400":
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CodedError"
+                  - example:
+                      {
+                        "result": "error",
+                        "msg": "User 10 is already subscribed to this channel.",
+                        "code": "BAD_REQUEST",
+                      }
+                    description: |
+                      An example JSON error response for when one of the users
+                      is already subscribed to the channel:
   /user_uploads:
     post:
       operationId: upload-file

@@ -21,6 +21,7 @@
 * [Get temporary URL for an uploaded file](/api/get-file-temporary-url)
 * [Check thumbnail status](/api/check-thumbnail-status)
 * [Report a message](/api/report-message)
+* [Notify mentioned users who aren't subscribed](/api/notify-unsubscribed-mentions)
 
 ## Scheduled messages
 

@@ -120,6 +120,21 @@ def iago_message_id() -> dict[str, object]:
     }
 
 
+@openapi_param_value_generator(["/messages/{message_id}/notify_unsubscribed_mentions:post"])
+def message_mentioning_unsubscribed_user() -> dict[str, object]:
+    iago = helpers.example_user("iago")
+    hamlet = helpers.example_user("hamlet")
+    stream_name = "mention notifications curl example"
+    helpers.subscribe(iago, stream_name)
+    message_id = helpers.send_stream_message(
+        iago, stream_name, content=f"@**|{hamlet.id}** Could you take a look at this?"
+    )
+    return {
+        "message_id": message_id,
+        "user_ids": [hamlet.id],
+    }
+
+
 @openapi_param_value_generator(["/messages/{message_id}/reactions:delete"])
 def add_emoji_to_message() -> dict[str, object]:
     user_profile = helpers.example_user("iago")

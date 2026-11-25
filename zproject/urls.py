@@ -210,6 +210,7 @@ from zerver.views.thumbnail import backend_serve_thumbnail, check_thumbnail_stat
 from zerver.views.tusd import handle_tusd_hook
 from zerver.views.typing import send_message_edit_notification_backend, send_notification_backend
 from zerver.views.unsubscribe import email_unsubscribe
+from zerver.views.unsubscribed_mentions import notify_unsubscribed_mentioned_users_backend
 from zerver.views.upload import (
     serve_file_backend,
     serve_file_download_backend,
@@ -453,6 +454,11 @@ v1_api_and_json_patterns = [
     rest_path("messages/<int:message_id>/read_receipts", GET=read_receipts),
     # report_message_backend -> zerver.views.message_report
     rest_path("messages/<int:message_id>/report", POST=report_message_backend),
+    # notify_unsubscribed_mentioned_users_backend -> zerver.views.unsubscribed_mentions
+    rest_path(
+        "messages/<int:message_id>/notify_unsubscribed_mentions",
+        POST=notify_unsubscribed_mentioned_users_backend,
+    ),
     # attachments -> zerver.views.attachments
     rest_path("attachments", GET=list_by_user),
     rest_path("attachments/<int:attachment_id>", DELETE=remove),
